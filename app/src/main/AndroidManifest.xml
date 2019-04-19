@@ -16,6 +16,22 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <receiver
+            android:name=".receivers.TimerActionReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="START" />
+                <action android:name="STOP" />
+                <action android:name="RESET" />
+                <action android:name="EXPIRED" />
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name=".services.CountDownService"
+            android:exported="false"/>
     </application>
 
 </manifest>
