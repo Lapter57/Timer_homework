@@ -1,6 +1,6 @@
 package ru.ok.timer.util;
 
-import android.app.AlarmManager;
+import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -12,14 +12,16 @@ import android.os.Build;
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
 import ru.ok.timer.MainActivity;
+import ru.ok.timer.R;
 import ru.ok.timer.receivers.TimerActionReceiver;
 
-import ru.ok.timer.R;
-import ru.ok.timer.services.CountDownService;
+import static ru.ok.timer.util.Timers.TIMER_ID;
+import static ru.ok.timer.util.Timers.TimerActions;
+import static ru.ok.timer.util.Timers.TimerState;
+import static ru.ok.timer.util.Timers.formattedTime;
 
 public final class TimerNotifications {
 
-    private static final int TIMER_ID = 0;
     private static final String TIMER_CHANNEL_ID = "ru.ok.timer.timerChannel";
     private static final String TIMER_CHANNEL_NAME = "Techno Timer";
 
@@ -28,32 +30,29 @@ public final class TimerNotifications {
         throw new AssertionError();
     }
 
-    public static void showTimerRunningNotification(@NonNull final Context context,
-                                                    @NonNull final long timeLeft) {
-        final PendingIntent stopPendingIntent = getPendingIntent(TimerActions.STOP, context);
-        final NotificationCompat.Builder builder = getNotificationBuilder(context);
-        builder.setContentIntent(getPendingIntentWithStack(context, MainActivity.class))
-               .setContentText(MainActivity.formattedTime(timeLeft))
-               .addAction(R.drawable.ic_pause, "Stop", stopPendingIntent);
-        showNotification(context, builder);
+    public static Notification createNotification(
+            @NonNull final Context context,
+            @NonNull final long timeLeft,
+            @NonNull final TimerState timerState) {
+        final Notification notification =
+                createTimerStateNotification(context, timeLeft, timerState);
+        if (notification != null) {
+            creatNotificationChannel(context);
+        }
+        return notification;
     }
 
-    public static void showTimerStoppedNotification(@NonNull final Context context) {
-        final PendingIntent startPendingIntent = getPendingIntent(TimerActions.START, context);
-        final PendingIntent resetPendingIntent = getPendingIntent(TimerActions.RESET, context);
-        final NotificationCompat.Builder builder = getNotificationBuilder(context);
-        builder.setContentText("Timer paused")
-               .setContentIntent(getPendingIntentWithStack(context, MainActivity.class))
-               .addAction(R.drawable.ic_start, "Start", startPendingIntent)
-               .addAction(R.drawable.ic_reset, "Reset", resetPendingIntent);
-        showNotification(context, builder);
-    }
-
-    public static void showTimerExpiredNotification(@NonNull final Context context) {
-        final NotificationCompat.Builder builder = getNotificationBuilder(context);
-        builder.setContentText("Timer expired")
-               .setContentIntent(getPendingIntentWithStack(context, MainActivity.class));
-        showNotification(context, builder);
+    public static void updateNotification(
+            @NonNull final Context context,
+            @NonNull final long timeLeft,
+            @NonNull final TimerState timerState) {
+        final Notification notification =
+                createTimerStateNotification(context, timeLeft, timerState);
+        final NotificationManager notificationManager =
+                (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (notificationManager != null) {
+            notificationManager.notify(TIMER_ID, notification);
+        }
     }
 
     public static void removeNotification(@NonNull final Context context) {
@@ -64,35 +63,51 @@ public final class TimerNotifications {
         }
     }
 
-    public static void setAlarm(@NonNull final Context context,
-                                @NonNull final long wakeUpTime) {
-        final AlarmManager alarmManager =
-                (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-        final PendingIntent pendingIntent = getAlarmPendingIntent(context);
-
-        if (alarmManager != null) {
-            alarmManager.setExact(AlarmManager.RTC_WAKEUP, wakeUpTime, pendingIntent);
-            Intent serviceIntent = new Intent(context, CountDownService.class);
-            context.startService(serviceIntent);
+    private static Notification createTimerStateNotification(
+            @NonNull final Context context,
+            @NonNull final long timeLeft,
+            @NonNull final TimerState timerState) {
+        switch (timerState) {
+            case RUNNING:
+                return createTimerRunningNotification(context, timeLeft);
+            case PAUSED:
+                return createTimerPausedNotification(context);
+            case STOPPED:
+                return createTimerExpiredNotification(context);
         }
-    }
-
-    public static void removeAlarm(@NonNull final Context context) {
-        final AlarmManager alarmManager =
-                (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-        final PendingIntent pendingIntent = getAlarmPendingIntent(context);
-        if (alarmManager != null) {
-            alarmManager.cancel(pendingIntent);
-            Intent serviceIntent = new Intent(context, CountDownService.class);
-            context.stopService(serviceIntent);
-        }
+        return null;
     }
 
     @NonNull
-    private static PendingIntent getAlarmPendingIntent(@NonNull final Context context) {
-        final Intent intent = new Intent(context, TimerActionReceiver.class);
-        intent.setAction(TimerActions.EXPIRED.toString());
-        return PendingIntent.getBroadcast(context, 0, intent, 0);
+    private static Notification createTimerRunningNotification(
+            @NonNull final Context context,
+            @NonNull final long timeLeft) {
+        final PendingIntent stopPendingIntent = getPendingIntent(TimerActions.PAUSE, context);
+        final NotificationCompat.Builder builder = getNotificationBuilder(context);
+        builder.setContentIntent(getPendingIntentWithStack(context, MainActivity.class))
+               .setContentText(formattedTime(timeLeft))
+               .addAction(R.drawable.ic_pause, "Pause", stopPendingIntent);
+        return builder.build();
+    }
+
+    @NonNull
+    private static Notification createTimerPausedNotification(@NonNull final Context context) {
+        final PendingIntent startPendingIntent = getPendingIntent(TimerActions.START, context);
+        final PendingIntent resetPendingIntent = getPendingIntent(TimerActions.RESET, context);
+        final NotificationCompat.Builder builder = getNotificationBuilder(context);
+        builder.setContentText("Timer paused")
+               .setContentIntent(getPendingIntentWithStack(context, MainActivity.class))
+               .addAction(R.drawable.ic_start, "Start", startPendingIntent)
+               .addAction(R.drawable.ic_reset, "Reset", resetPendingIntent);
+        return builder.build();
+    }
+
+    @NonNull
+    private static Notification createTimerExpiredNotification(@NonNull final Context context) {
+        final NotificationCompat.Builder builder = getNotificationBuilder(context);
+        builder.setContentText("Timer expired")
+               .setContentIntent(getPendingIntentWithStack(context, MainActivity.class));
+        return builder.build();
     }
 
     @NonNull
@@ -116,8 +131,9 @@ public final class TimerNotifications {
     }
 
     @NonNull
-    private static <T> PendingIntent getPendingIntentWithStack(@NonNull final Context context,
-                                                               @NonNull final Class<T> clazz) {
+    private static <T> PendingIntent getPendingIntentWithStack(
+            @NonNull final Context context,
+            @NonNull final Class<T> clazz) {
         final Intent resultIntent = new Intent(context, clazz);
         final TaskStackBuilder stackBuilder = TaskStackBuilder.create(context);
         stackBuilder.addParentStack(clazz);
@@ -125,8 +141,7 @@ public final class TimerNotifications {
         return stackBuilder.getPendingIntent(0, PendingIntent.FLAG_UPDATE_CURRENT);
     }
 
-    private static void showNotification(@NonNull final Context context,
-                                         @NonNull final NotificationCompat.Builder builder) {
+    private static void creatNotificationChannel(@NonNull final Context context) {
         final NotificationManager notificationManager =
                 (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -139,15 +154,5 @@ public final class TimerNotifications {
                 notificationManager.createNotificationChannel(channel);
             }
         }
-        if (notificationManager != null) {
-            notificationManager.notify(TIMER_ID, builder.build());
-        }
-    }
-
-    public enum TimerActions {
-        START,
-        STOP,
-        RESET,
-        EXPIRED
     }
 }

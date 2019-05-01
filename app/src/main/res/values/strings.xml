@@ -3,5 +3,5 @@
 
     <string name="reset">reset</string>
     <string name="start">start</string>
-    <string name="stop">stop</string>
+    <string name="pause">pause</string>
 </resources>

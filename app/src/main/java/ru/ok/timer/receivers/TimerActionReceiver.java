@@ -4,14 +4,12 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 
+import ru.ok.timer.services.TimerService;
 import ru.ok.timer.util.TimerNotifications;
 import ru.ok.timer.util.TimerPreferences;
 
-import static ru.ok.timer.MainActivity.TimerState;
-import static ru.ok.timer.util.TimerNotifications.TimerActions.EXPIRED;
-import static ru.ok.timer.util.TimerNotifications.TimerActions.RESET;
-import static ru.ok.timer.util.TimerNotifications.TimerActions.START;
-import static ru.ok.timer.util.TimerNotifications.TimerActions.STOP;
+import static ru.ok.timer.util.Timers.TimerActions;
+import static ru.ok.timer.util.Timers.TimerState;
 
 public class TimerActionReceiver extends BroadcastReceiver {
 
@@ -19,32 +17,28 @@ public class TimerActionReceiver extends BroadcastReceiver {
     public void onReceive(final Context context, final Intent intent) {
         if (intent.getAction() != null) {
             final String action = intent.getAction();
+            final TimerActions timerActions = TimerActions.valueOf(action);
+            final Intent serviceIntent = new Intent(context, TimerService.class);
+            switch (timerActions) {
+                case START:
+                    TimerPreferences.setTimerState(TimerState.RUNNING, context);
+                    context.startService(serviceIntent);
+                    break;
 
-            if (action.equals(START.toString())) {
-                final long timeLeft = TimerPreferences.getTimeLeft(context);
-                final long wakeUpTime = System.currentTimeMillis() + timeLeft;
-                TimerPreferences.setTimerState(TimerState.RUNNING, context);
-                TimerPreferences.setWakeUpTime(wakeUpTime, context);
-                TimerNotifications.setAlarm(context, wakeUpTime);
-                TimerNotifications.showTimerRunningNotification(context, timeLeft);
+                case PAUSE:
+                    context.stopService(serviceIntent);
+                    final long timeLeft = TimerPreferences.getTimeLeft(context);
+                    TimerPreferences.setTimerState(TimerState.PAUSED, context);
+                    TimerNotifications.updateNotification(context,
+                            timeLeft, TimerState.PAUSED);
+                    break;
 
-            } else if (action.equals(STOP.toString())) {
-                final long wakeUpTime = TimerPreferences.getWakeUpTime(context);
-                final long timeLeft = wakeUpTime - System.currentTimeMillis();
-                TimerPreferences.setTimeLeft(timeLeft, context);
-                TimerPreferences.setTimerState(TimerState.PAUSED, context);
-                TimerNotifications.removeAlarm(context);
-                TimerNotifications.showTimerStoppedNotification(context);
+                case RESET:
+                    context.stopService(serviceIntent);
+                    TimerPreferences.setDefaultPreferences(context);
+                    TimerNotifications.removeNotification(context);
+                    break;
 
-            } else if (action.equals(RESET.toString())) {
-                TimerPreferences.setDefaultPreferences(context);
-                TimerNotifications.removeAlarm(context);
-                TimerNotifications.removeNotification(context);
-
-            } else if (action.equals(EXPIRED.toString())) {
-                TimerPreferences.setDefaultPreferences(context);
-                TimerNotifications.removeAlarm(context);
-                TimerNotifications.showTimerExpiredNotification(context);
             }
         }
     }

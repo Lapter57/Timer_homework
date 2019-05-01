@@ -6,13 +6,14 @@ import android.content.SharedPreferences.Editor;
 import android.preference.PreferenceManager;
 
 import androidx.annotation.NonNull;
-import ru.ok.timer.MainActivity.TimerState;
+
+import static ru.ok.timer.util.Timers.TIMER_LENGTH_IN_MILLIS;
+import static ru.ok.timer.util.Timers.TimerState;
 
 public final class TimerPreferences {
 
     private static final String TIMER_STATE_ID = "ru.ok.timer.timerState";
     private static final String TIME_LEFT_ID = "ru.ok.timer.timeLeft";
-    private static final String WAKE_UP_TIME_ID = "ru.ok.timer.wakeUpTime";
 
     // Suppress default constructor for noninstantiability
     private TimerPreferences() {
@@ -48,22 +49,8 @@ public final class TimerPreferences {
         return preferences.getLong(TIME_LEFT_ID, 0);
     }
 
-    public static void setWakeUpTime(@NonNull final long wakeUpTime,
-                                     @NonNull final Context context) {
-        final Editor editor = PreferenceManager.getDefaultSharedPreferences(context).edit();
-        editor.putLong(WAKE_UP_TIME_ID, wakeUpTime);
-        editor.apply();
-    }
-
-    public static long getWakeUpTime(@NonNull final Context context) {
-        final SharedPreferences preferences =
-                PreferenceManager.getDefaultSharedPreferences(context);
-        return preferences.getLong(WAKE_UP_TIME_ID, 0);
-    }
-
     public static void setDefaultPreferences(@NonNull final Context context) {
         setTimerState(TimerState.STOPPED, context);
-        setTimeLeft(0, context);
-        setWakeUpTime(0, context);
+        setTimeLeft(TIMER_LENGTH_IN_MILLIS, context);
     }
 }
